@@ -1,3 +1,4 @@
+//This is a Javascript code for running in the Google Earth Engine
 //edit roi region here, or use the roi input file
 var roi = ee.Geometry.Polygon({
   coords: //insert research ROI boundary here 
