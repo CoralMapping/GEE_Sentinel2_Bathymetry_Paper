@@ -1,0 +1,76 @@
+//edit roi region here, or use the roi input file
+var roi = ee.Geometry.Polygon({
+  coords: //insert research ROI boundary here 
+        });
+
+//building the clean mosiac image based on different filters
+var cloudBitMask = ee.Number(2).pow(10).int();
+var cirrusBitMask = ee.Number(2).pow(11).int();
+
+function mask(img){
+  var qa = img.select('QA60');
+  var ma = qa.bitwiseAnd(cloudBitMask).eq(0).and(
+             qa.bitwiseAnd(cirrusBitMask).eq(0));
+   
+  ma = ma.and(img.select(['SCL']).neq(3));
+  ma = ma.and(img.select(['SCL']).neq(4));
+  ma = ma.and(img.select(['SCL']).neq(5));
+  ma = ma.and(img.select(['SCL']).neq(8));
+  ma = ma.and(img.select(['SCL']).neq(9));
+  ma = ma.and(img.select(['SCL']).neq(10));
+  ma = ma.and(img.select(['B9']).lt(300));
+  ma = ma.and(img.select(['B9']).gt(50));
+  ma = ma.and(img.select(['B3']).gt(100));//.focal_min({kernel: ee.Kernel.circle({radius: 5}), iterations: 1}));
+  ma = ma.focal_min({kernel: ee.Kernel.circle({radius: 1}), iterations: 1});
+  img = img.mask(ma);
+ 
+  //adjust for mask bad data
+    img = img.updateMask(img.select([4]).lt(1000));
+    img = img.updateMask(img.select([7]).lt(300))
+  
+  var ndwi_revise = (img.select([2]).subtract(img.select([7]))).divide(img.select([2]).add(img.select([7])));
+         img = img.updateMask(ndwi_revise.gt(0));
+  //end of adjust
+  
+  return img;
+}
+//bad water region maskout end
+
+//set the filter input data to Sentinel-2 depth data
+var sentinel = ee.ImageCollection('COPERNICUS/S2_SR').filter(ee.Filter.bounds(roi));
+
+//Set up the date range and filter, this example uses two years window to build the clean water mosaic
+sentinel = sentinel.filter(ee.Filter.date(ee.Date.fromYMD(2019,1,1),ee.Date.fromYMD(2020,12,31)));
+
+//run the mask function
+sentinel = sentinel.map(mask);
+
+//get the median value of it
+var median = sentinel.reduce(ee.Reducer.median());
+
+//calculate the big Rrs, rrs,and rrs*1000
+var bigrrs = median.divide(ee.Number(31415.926));
+var rrsvec = bigrrs.divide((bigrrs.multiply(ee.Number(1.7))).add(ee.Number(0.52)));
+var rrsvec1k = rrsvec.multiply(ee.Number(1000));
+
+//set the chla value for depth processing
+var chla = 0.5;
+//0.5 is chla value
+var m0 = ee.Number(52.073 * Math.exp(0.957*chla));
+var m1 = ee.Number(50.156 * Math.exp(0.957*chla));
+
+//calculate rrs vec
+var lnrrsvec = rrsvec1k.log();
+
+//calculate depth here
+var depth = ((lnrrsvec.select([1]).divide(lnrrsvec.select([2]))).multiply(m0)).subtract(m1);
+
+
+//set boundary, remove nagative value or large value in the result
+var depthmA = depth.where(depth.lt(0), ee.Number(0));
+var epth_output = depthmA.where(depthmA.gt(20), ee.Number(20));
+//end set
+//depthm_output is the final bathymetry
+
+//plot depth_output
+Map.addLayer(depth_output, {min: 0, max: 15, palette: ['00FFFF', '0000FF']});
