@@ -8,6 +8,7 @@ var cloudBitMask = ee.Number(2).pow(10).int();
 var cirrusBitMask = ee.Number(2).pow(11).int();
 
 //this function is used to build clean water mosaic in the Google Earth Engine
+//the threshold value could be revised, the current value is suggested for a common clean coral reefs waters
 function mask(img){
   var qa = img.select('QA60');
   var ma = qa.bitwiseAnd(cloudBitMask).eq(0).and(
@@ -55,6 +56,8 @@ var rrsvec = bigrrs.divide((bigrrs.multiply(ee.Number(1.7))).add(ee.Number(0.52)
 var rrsvec1k = rrsvec.multiply(ee.Number(1000));
 
 //set the chla value for depth processing
+//chla value could be adjusted to specific site
+//chla = 0.5 is calculated from 20 global coral reefs regions
 var chla = 0.5;
 //0.5 is chla value
 var m0 = ee.Number(52.073 * Math.exp(0.957*chla));
@@ -68,10 +71,10 @@ var depth = ((lnrrsvec.select([1]).divide(lnrrsvec.select([2]))).multiply(m0)).s
 
 
 //set boundary, remove nagative value or large value in the result
-var depthmA = depth.where(depth.lt(0), ee.Number(0));
-var epth_output = depthmA.where(depthmA.gt(20), ee.Number(20));
+var depthA = depth.where(depth.lt(0), ee.Number(0));
+var depth_output = depthA.where(depthA.gt(20), ee.Number(20));
 //end set
-//depthm_output is the final bathymetry
+//depth_output is the final bathymetry
 
 //plot depth_output
 Map.addLayer(depth_output, {min: 0, max: 15, palette: ['00FFFF', '0000FF']});
