@@ -7,6 +7,7 @@ var roi = ee.Geometry.Polygon({
 var cloudBitMask = ee.Number(2).pow(10).int();
 var cirrusBitMask = ee.Number(2).pow(11).int();
 
+//this function is used to build clean water mosaic in the Google Earth Engine
 function mask(img){
   var qa = img.select('QA60');
   var ma = qa.bitwiseAnd(cloudBitMask).eq(0).and(
